@@ -1,31 +1,31 @@
-tslnews <- sentiStock::get_all_news("TSLA", 90)
-library(magrittr)
-
-clean_and_create_corpus <- function(data, text_type){
-  news_from_source <- data %>%
-    dplyr::select(id, publishedDate, paste0(text_type)) %>%
-    dplyr::rename(date = publishedDate, texts = description)
-    news_sento <- sentometrics::sento_corpus(news_from_source)
-}
-
-tsla <- clean_and_create_corpus(tslnews, "description")
-
-# Fit the topipc Model
-
-dfm <- dfm(tsla, tolower = TRUE,
-               remove_punct = TRUE, remove_numbers = TRUE, remove = stopwords("en")) %>%
-      dfm_remove(min_nchar = 3) %>%
-      # Trim a dfm using frequency threshold-based feature selection
-      dfm_trim(min_termfreq = 0.95, termfreq_type = "quantile") %>%
-      dfm_trim(max_docfreq = 0.10, docfreq_type = "prop")
-dfm <- dfm_subset(dfm, ntoken(dfm) > 0)
-
-# Extract 5 Topics
-topicModel <- stm::stm(dfm, K = , verbose = FALSE)
-topTerms <- t(stm::labelTopics(topicModel, n = 30)[["prob"]])
-
-# Take a look at the top 5 terms
-topTerms[, 1:5]
+# tslnews <- sentiStock::get_all_news("TSLA", 90)
+# library(magrittr)
+#
+# clean_and_create_corpus <- function(data, text_type){
+#   news_from_source <- data %>%
+#     dplyr::select(id, publishedDate, paste0(text_type)) %>%
+#     dplyr::rename(date = publishedDate, texts = description)
+#     news_sento <- sentometrics::sento_corpus(news_from_source)
+# }
+#
+# tsla <- clean_and_create_corpus(tslnews, "description")
+#
+# # Fit the topipc Model
+#
+# dfm <- dfm(tsla, tolower = TRUE,
+#                remove_punct = TRUE, remove_numbers = TRUE, remove = stopwords("en")) %>%
+#       dfm_remove(min_nchar = 3) %>%
+#       # Trim a dfm using frequency threshold-based feature selection
+#       dfm_trim(min_termfreq = 0.95, termfreq_type = "quantile") %>%
+#       dfm_trim(max_docfreq = 0.10, docfreq_type = "prop")
+# dfm <- dfm_subset(dfm, ntoken(dfm) > 0)
+#
+# # Extract 5 Topics
+# topicModel <- stm::stm(dfm, K = , verbose = FALSE)
+# topTerms <- t(stm::labelTopics(topicModel, n = 30)[["prob"]])
+#
+# # Take a look at the top 5 terms
+# topTerms[, 1:5]
 
     # corpus_summarize(tsla)
 # lexicons <- sento_lexicons(list_lexicons[c("GI_en", "LM_en", "HENRY_en")])

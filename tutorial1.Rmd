@@ -1,0 +1,75 @@
+---
+title: "Textual Sentiment Analysis"
+author: "Mandip Mistry"
+date: "07/08/2020"
+output: html_document
+---
+
+Learning outcomes
+
+As part of this tutorial, you will learn how to:
+
+- Decompose your texts into bins (typically equal-sized containers of words) or sentences.
+ -Compute sentiment with a variety of weighting schemes.
+ -Create and use your own weighting scheme for a classification task.
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library("data.table")    # package bringing in the data.table machinery
+library("quanteda")      # package useful for text and corpus manipulation
+library("sentometrics")  # package containing sentiment computation tools
+library("lexicon")       # package with multiple lexicons
+library(dpl)
+
+# Bring in Data on UVXY
+vol_news <- do.call(rbind, lapply(c("TSLA"), get_all_news, 90))
+# Use the description as the text data set
+news_from_source <- vol_news %>%
+    select(id, publishedDate, description) %>%
+    rename(date = publishedDate, texts = description) %>% 
+  distinct()
+    
+news_sento <- sentometrics::sento_corpus(news_from_source)
+
+# Create 2 Lexicons 1 Base one on Absolute values
+lex <- lexicon::hash_sentiment_jockers_rinker
+
+sentoLexicon <- sento_lexicons(list(baseLex = lex,
+                                    absoluteLex = lex[, .(x = x, y = abs(y))]))
+lapply(sentoLexicon, head)
+
+#
+
+```
+
+A review of sentiment computation with sentometrics
+
+When using the default settings (i.e., only specifying the how argument), the sentiment for each word within a text will be determined according to the provided lexicons. This word-level sentiment is then aggregated using the method defined by the how argument, aggregating up to the document level to form a sentiment value for the document.
+
+```{r}
+sentiment_by_word <- compute_sentiment(news_sento, sentoLexicon, how = "proportional")
+head(sentiment_by_word)
+
+sentiment_by_sentence <- sentiment <- compute_sentiment(news_sento, sentoLexicon, how = "proportional", do.sentence = TRUE)
+head(sentiment_by_sentence)
+```
+
+Plot what you got
+
+You could bin by date every 5 days or something 
+
+```{r}
+par(mfrow = c(1, 2))
+
+plot(sentiment_by_word[, .(s = mean(`absoluteLex--dummyFeature`)), by = date], type = "l",
+     ylab = "Mean absolute sentiment")
+
+boxplot(sentiment_by_sentence$`absoluteLex--dummyFeature` ~ sentiment_by_sentence$date, ylab = "Absolute sentiment",
+        xlab = "Bin", outline = FALSE, range = 0.5)
+
+```
+
