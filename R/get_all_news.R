@@ -15,6 +15,7 @@ from <- 0
 repeat {
   res <-riingo::riingo_news(ticker=ticker, start_date=Sys.Date()-days_back,
                                  end_date=Sys.Date(), limit=1000, offset = from)
+  res <- cbind(res, ticker)
   results <- rbind(res, results)
   if (nrow(res) == 1000) {
     message("Fetching next 1000 records...")
