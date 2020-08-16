@@ -16,7 +16,6 @@ library(purrr)
 # 1 Week Return - +10-35%
 # Price - $10-25 ( (Something you can afford)
 # Volume - 100K to infinity - (Need to be able to trade in and out quick )
-
 winners <- read_csv("Sentometrics_1_15082020.csv")
 
 # Stock Screen on Tiingo (Sentometrics 2)
@@ -24,6 +23,11 @@ winners <- read_csv("Sentometrics_1_15082020.csv")
 # Price - $10-25 ( (Something you can afford)
 # Volume - 100K to infinity - (Need to be able to trade in and out quick )
 losers <- read_csv("Sentometrics_2_15082020.csv")
+
+# Use the entire universe of NYSE Tickers
+all_tickers <- supported_tickers()
+nyse_only <- all_tickers %>% filter(exchange == "NYSE") %>% na.omit()
+all_nyse_news <- do.call(rbind, lapply(nyse_only$ticker, get_all_news, 5))
 
 # Get the last 3 months news on all of the names
 winners_raw_news <- do.call(rbind, lapply(winners$Ticker, get_all_news, 90))
@@ -36,7 +40,6 @@ prices_df <- riingo_prices(allsymbols, start_date = Sys.Date()-90, end_date = Sy
 # Shrink the prices df down to what you need
 prices_df <- prices_df %>%
   select(ticker, date, adjClose, volume)
-
 
 # Bins the number of news articles on each ticker  by week
 # Start with splitting the news dataframe up by ticker
@@ -53,7 +56,6 @@ winners_cleaned_news <- lapply(winners_news_list, clean_up_tiingo_news)
 winners_list_sento_corpus <- lapply(winners_cleaned_news, sento_corpus)
 # Compute the text summaries
 winners_corpus_summaries <- lapply(winners_list_sento_corpus, corpus_summarize, by = "week")
-lapply(winners_corpus_summaries, get_dates)
 # Extract just the stats
 winners_corpus_stats <- lapply(winners_corpus_summaries, function(x){x$stats})
 
@@ -139,9 +141,16 @@ ctrAggPred <- ctr_agg(
 )
 
 # Aggregate the corpus into textual sentiment time series
-
 sentmeaspred <- lapply(winners_list_sento_corpus_newfeat,
                        sento_measures,
                        lexicons = lex, ctr = ctrAggPred)
 
-sentMeasIn <- mapply(function(x,y){subset(x, date %in% y$date)}, sentmeaspred,)
+# Get the price data from quantmod
+data.env <- new.env()
+getSymbols(winners$Ticker, env = data.env, src= "tiingo",  api = "181f4c56b03d7fa96e17339ab1d94ae27b4035a1",
+           from = Sys.Date()-90, to = Sys.Date())
+
+prices_df <- riingo_prices(winners$Ticker, start_date = Sys.Date()-90, end_date = Sys.Date())
+prices_list <- split(prices_df, prices_df$ticker)
+
+sentMeasIn <- mapply(function(x,y){subset(x, date %in% y$date)}, sentmeaspred, prices_list)
