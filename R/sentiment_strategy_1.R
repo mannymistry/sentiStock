@@ -4,7 +4,7 @@
 # Predict the direction of the stock (Postive Sentiment = Increase in Price)
 
 library(riingo)
-library(sentiStock)
+# library(sentiStock)
 library(PerformanceAnalytics)
 library(dplyr)
 library(readr)
@@ -27,7 +27,7 @@ losers <- read_csv("Sentometrics_2_15082020.csv")
 # Use the entire universe of NYSE Tickers
 all_tickers <- supported_tickers()
 nyse_only <- all_tickers %>% filter(exchange == "NYSE") %>% na.omit()
-all_nyse_news <- do.call(rbind, lapply(nyse_only$ticker, get_all_news, 5))
+all_nyse_news <- do.call(rbind, lapply(nyse_only$ticker, get_all_news, 90))
 
 # Get the last 3 months news on all of the names
 winners_raw_news <- do.call(rbind, lapply(winners$Ticker, get_all_news, 90))
@@ -145,12 +145,38 @@ sentmeaspred <- lapply(winners_list_sento_corpus_newfeat,
                        sento_measures,
                        lexicons = lex, ctr = ctrAggPred)
 
-# Get the price data from quantmod
-data.env <- new.env()
-getSymbols(winners$Ticker, env = data.env, src= "tiingo",  api = "181f4c56b03d7fa96e17339ab1d94ae27b4035a1",
-           from = Sys.Date()-90, to = Sys.Date())
 
-prices_df <- riingo_prices(winners$Ticker, start_date = Sys.Date()-90, end_date = Sys.Date())
-prices_list <- split(prices_df, prices_df$ticker)
+adnt_corpus <- winners_list_sento_corpus$ADNT
+sentMeasPred <- sento_measures(adnt_corpus, lexicons = lex, ctr = ctrAggPred)
+nmeasures(sentMeasPred)
 
-sentMeasIn <- mapply(function(x,y){subset(x, date %in% y$date)}, sentmeaspred, prices_list)
+adnt_price <- riingo_prices("ADNT", start_date = Sys.Date()-90, end_date = Sys.Date()) %>%
+  select(date, adjClose) %>%
+  as.data.frame()
+adnt_price$date <- as.Date(adnt_price$date)
+
+sentMeasIn <- subset(sentMeasPred, date %in% adnt_price$date)
+datesIn <- get_dates(sentMeasIn)
+
+y <- adnt_price[adnt_price$date %in% datesIn, "adjClose"]
+x <- data.frame(lag = y)
+
+ctrIter <- ctr_model(model = "gaussian",
+                     type = "BIC",
+                     h = 1,
+                     alphas = c(0, 0.1, 0.3, 0.5, 0.7, 0.9, 1),
+                     do.iter = TRUE,
+                     oos = 100, # h - 1
+                     nSample = 100,
+                     nCore = 1,
+                     do.progress = FALSE)
+
+out <- sento_model(sentMeasIn, x = x, y = y, ctr = ctrIter)
+summary(out)
+
+plot(out)
+attr <- attributions(out, sentMeasIn, do.lags = FALSE, do.normalize = FALSE)
+
+
+plot(attr, group = "features")
+plot(attr, group = "lexicons")
